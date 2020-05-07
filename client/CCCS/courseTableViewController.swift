@@ -10,26 +10,21 @@ import UIKit
 
 class courseTableViewController: UITableViewController {
     @IBOutlet weak var courseTableView: UITableView!
+    
     var courseList = [Course]()
     var selectedCourse: Course = Course([:])
     
     override func viewDidLoad() {
         super.viewDidLoad()
         self.refreshControl = UIRefreshControl()
-        self.refreshControl!.addTarget(self, action: #selector(refreshdata),for: .valueChanged)
+        self.refreshControl!.addTarget(self, action: #selector(refreshData),for: .valueChanged)
         self.refreshControl!.attributedTitle = NSAttributedString(string: "Loading")
-        refreshdata()
-    }
-    
-    @objc func refreshdata(){
-        makeGetCourseListCall()
-        self.tableView.reloadData()
-        self.refreshControl!.endRefreshing()
+        self.refreshData()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        makeGetCourseListCall()
+        self.refreshData()
     }
     
     override func didReceiveMemoryWarning() {
@@ -44,7 +39,8 @@ class courseTableViewController: UITableViewController {
         }
     }
     
-    @IBAction func refreshCourseList(_ sender: Any) {
+    @objc func refreshData(){
+        self.refreshControl!.beginRefreshing()
         makeGetCourseListCall()
     }
     
@@ -62,6 +58,9 @@ class courseTableViewController: UITableViewController {
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.refreshControl!.endRefreshing()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -76,7 +75,9 @@ class courseTableViewController: UITableViewController {
                     for courseDic in responseDic["info"] as! [[String : Any]] {
                         self.courseList.append(Course(courseDic))
                     }
-                    DispatchQueue.main.async { self.courseTableView.reloadData() }
+                    DispatchQueue.main.async {
+                        self.courseTableView.reloadData()
+                    }
                 }
             } catch let parsingError {
                 self.showAlert("Error", parsingError.localizedDescription)

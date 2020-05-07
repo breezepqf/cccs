@@ -16,4 +16,3 @@ else
 close_db($conn);
 
 ?>
- 

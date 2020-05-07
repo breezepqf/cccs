@@ -10,31 +10,32 @@ import UIKit
 
 class questionTableViewController: UITableViewController {
     @IBOutlet var questionTableView: UITableView!
-    @IBOutlet weak var typeSegmentedControl: UISegmentedControl!
+    @IBOutlet weak var filterSegmentedControl: UISegmentedControl!
     
-    var currentLesson = Lesson([:])
-    var questionList = [Question]()
+    var selectedCourse: Course = Course([:])
+    var currentLessonLid: Int = -1
+    var questionListAll = [Question]()
+    var questionListCnt = [Question]()
     var selectedQuestion = Question([:])
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        if user.type == "Student" {
+        if (selectedCourse.lessonlist.count != 0 &&
+            selectedCourse.lessonlist[0].end_time == "") {
+            currentLessonLid = selectedCourse.lessonlist[0].lid
+        }
+        if (user.type == "Student" || currentLessonLid == -1) {
             navigationItem.rightBarButtonItem = nil
         }
-        self.refreshControl = UIRefreshControl()
-        self.refreshControl!.addTarget(self, action: #selector(refreshdata),for: .valueChanged)
-        self.refreshControl!.attributedTitle = NSAttributedString(string: "Loading")
-        refreshdata()
-    }
-    
-    @objc func refreshdata(){
-        makeGetQuestionListCall(typeSegmentedControl.selectedSegmentIndex)
-        self.tableView.reloadData()
-        self.refreshControl!.endRefreshing()
+        refreshControl = UIRefreshControl()
+        refreshControl!.addTarget(self, action: #selector(refreshData),for: .valueChanged)
+        refreshControl!.attributedTitle = NSAttributedString(string: "Loading")
+        refreshData()
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        refreshData()
     }
     
     func showAlert(_ title : String, _ msg : String) {
@@ -45,12 +46,24 @@ class questionTableViewController: UITableViewController {
         }
     }
 
-    func makeGetQuestionListCall(_ searchway : Int) {
-        let str = "\(serverDir)/getQuestionList.php?username=\(user.username)&password=\(user.password)&type=\(user.type)&lid=\(currentLesson.lid)&searchway=\(searchway)"
+    @objc func refreshData() {
+        refreshControl!.beginRefreshing()
+        makeGetQuestionListCall()
+    }
+    
+    @IBAction func filterValueChanged(_ sender: Any) {
+        questionTableView.reloadData()
+    }
+    
+    func makeGetQuestionListCall() {
+        let str = "\(serverDir)/getQuestionList.php?username=\(user.username)&password=\(user.password)&type=\(user.type)&cid=\(selectedCourse.cid)"
         let urlRequest = URLRequest(url: URL(string: str)!)
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.refreshControl!.endRefreshing()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -61,11 +74,18 @@ class questionTableViewController: UITableViewController {
                 if (responseDic["code"] as! Int == 1) {
                     self.showAlert("Error", responseDic["info"] as! String)
                 } else {
-                    self.questionList.removeAll()
+                    self.questionListAll.removeAll()
+                    self.questionListCnt.removeAll()
                     for questionDic in responseDic["info"] as! [[String : Any]] {
-                        self.questionList.append(Question(questionDic))
+                        let question = Question(questionDic)
+                        self.questionListAll.append(question)
+                        if (question.lid == self.currentLessonLid) {
+                            self.questionListCnt.append(question)
+                        }
                     }
-                    DispatchQueue.main.async { self.questionTableView.reloadData() }
+                    DispatchQueue.main.async {
+                        self.questionTableView.reloadData()
+                    }
                 }
             } catch let parsingError {
                 self.showAlert("Error", parsingError.localizedDescription)
@@ -76,7 +96,11 @@ class questionTableViewController: UITableViewController {
     }
     
     override func numberOfSections(in tableView: UITableView) -> Int {
-        return questionList.count
+        if (filterSegmentedControl.selectedSegmentIndex == 0) {
+            return questionListCnt.count
+        } else {
+            return questionListAll.count
+        }
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -89,23 +113,46 @@ class questionTableViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
-        if indexPath.row == 0 {
-            cell.textLabel?.text = "Description:"
-            cell.detailTextLabel?.text = questionList[indexPath.section].description
-        } else if indexPath.row == 1 {
-            cell.textLabel?.text = "Raised time:"
-            cell.detailTextLabel?.text = questionList[indexPath.section].raised_time
+        cell.selectionStyle = .none
+        cell.accessoryType = .none
+
+        if (filterSegmentedControl.selectedSegmentIndex == 0) {
+            if indexPath.row == 0 {
+                cell.textLabel?.text = "Description:"
+                cell.detailTextLabel?.text = questionListCnt[indexPath.section].description
+                
+            } else if indexPath.row == 1 {
+                cell.textLabel?.text = "Raised time:"
+                cell.detailTextLabel?.text = questionListCnt[indexPath.section].raised_time
+            } else {
+                cell.textLabel?.text = "Details:"
+                cell.detailTextLabel?.text = ""
+                cell.accessoryType = .disclosureIndicator
+            }
         } else {
-            cell.textLabel?.text = "Details:"
-            cell.detailTextLabel?.text = ""
-            cell.accessoryType = .disclosureIndicator
+            if indexPath.row == 0 {
+                cell.textLabel?.text = "Description:"
+                cell.detailTextLabel?.text = questionListAll[indexPath.section].description
+                
+            } else if indexPath.row == 1 {
+                cell.textLabel?.text = "Raised time:"
+                cell.detailTextLabel?.text = questionListAll[indexPath.section].raised_time
+            } else {
+                cell.textLabel?.text = "Details:"
+                cell.detailTextLabel?.text = ""
+                cell.accessoryType = .disclosureIndicator
+            }
         }
         return cell
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         if (indexPath.row == 2) {
-            selectedQuestion = self.questionList[indexPath.section]
+            if (filterSegmentedControl.selectedSegmentIndex == 0) {
+                selectedQuestion = self.questionListCnt[indexPath.section]
+            } else {
+                selectedQuestion = self.questionListAll[indexPath.section]
+            }
             self.performSegue(withIdentifier: "segueToQuestionDetail", sender: self)
         }
     }
@@ -113,14 +160,11 @@ class questionTableViewController: UITableViewController {
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.destination is raiseQuestionViewController {
             let t = segue.destination as? raiseQuestionViewController
-            t?.currentLesson = self.currentLesson
+            t?.currentLesson = self.selectedCourse.lessonlist[0]
         }
         if segue.destination is questionDetailViewController {
             let t = segue.destination as? questionDetailViewController
             t?.selectedQuestion = self.selectedQuestion
         }
-    }
-    @IBAction func valueChanged(_ sender: UISegmentedControl) {
-        refreshdata()
     }
 }

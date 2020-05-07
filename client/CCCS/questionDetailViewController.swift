@@ -14,6 +14,7 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
     @IBOutlet weak var questionTableView: UITableView!
     @IBOutlet weak var questionDescriptionLabel: UILabel!
     @IBOutlet weak var mainButton: UIButton!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
     var selectedQuestion = Question([:])
     var answerRecordList = [AnswerRecord]()
@@ -36,6 +37,7 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
         } else {
             mainButton.setTitle("Submit", for: .normal)
         }
+        activityIndicator.hidesWhenStopped = true
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -57,6 +59,10 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.mainButton.isEnabled = true
+                self.activityIndicator.stopAnimating()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -93,6 +99,10 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.mainButton.isEnabled = true
+                self.activityIndicator.stopAnimating()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -101,6 +111,9 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
                 let responseJson = try JSONSerialization.jsonObject(with: responseData, options: [])
                 let responseDic = responseJson as! [String : Any]
                 if (responseDic["code"] as! Int == 0) {
+                    DispatchQueue.main.async {
+                        self.navigationController?.popViewController(animated: true)
+                    }
                     self.showAlert("Success", responseDic["info"] as! String)
                 } else {
                     self.showAlert("Error", responseDic["info"] as! String)
@@ -115,6 +128,8 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
     
     @IBAction func mainEvent(_ sender: Any) {
         if user.type == "Teacher" {
+            mainButton.isEnabled = false
+            activityIndicator.startAnimating()
             makeGetAnswerListCall()
         } else {
             if questionTableView.indexPathForSelectedRow?.section == nil {
@@ -128,13 +143,14 @@ class questionDetailViewController: UIViewController, UITableViewDelegate, UITab
                     [unowned self] success, authenticationError in
                     DispatchQueue.main.async {
                         if (success) {
+                            self.mainButton.isEnabled = false
+                            self.activityIndicator.startAnimating()
                             self.makeSubmitAnswerCall((self.questionTableView.indexPathForSelectedRow?.section)!)
-                                DispatchQueue.main.async { self.navigationController?.popViewController(animated: true) }
                         }
                     }
                 }
             } else {
-                self.showAlert("Touch ID/Face ID not available", "Your device is not configured for Touch ID/Face ID.")
+                self.showAlert("Touch ID / Face ID not available", "Your device is not configured for Touch ID / Face ID.")
             }
         }
     }

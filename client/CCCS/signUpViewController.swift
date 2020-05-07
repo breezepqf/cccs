@@ -15,6 +15,8 @@ class signUpViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var retypePasswordTextField: UITextField!
     @IBOutlet weak var roleSegmentedControl: UISegmentedControl!
     @IBOutlet weak var sexSegmentedControl: UISegmentedControl!
+    @IBOutlet weak var signUpButton: UIButton!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,6 +24,7 @@ class signUpViewController: UIViewController, UITextFieldDelegate {
         realnameTextField.delegate = self
         passwordTextField.delegate = self
         retypePasswordTextField.delegate = self
+        activityIndicator.hidesWhenStopped = true
     }
 
     override func didReceiveMemoryWarning() {
@@ -47,6 +50,10 @@ class signUpViewController: UIViewController, UITextFieldDelegate {
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.signUpButton.isEnabled = true
+                self.activityIndicator.stopAnimating()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -55,7 +62,9 @@ class signUpViewController: UIViewController, UITextFieldDelegate {
                 let responseJson = try JSONSerialization.jsonObject(with: responseData, options: [])
                 let responseDic = responseJson as! [String : Any]
                 if (responseDic["code"] as! Int == 0) {
-                    DispatchQueue.main.async { self.navigationController?.popViewController(animated: true) }
+                    DispatchQueue.main.async {
+                        self.navigationController?.popViewController(animated: true)
+                    }
                     self.showAlert("Success", responseDic["info"] as! String)
                 } else {
                     self.showAlert("Error", responseDic["info"] as! String)
@@ -78,6 +87,8 @@ class signUpViewController: UIViewController, UITextFieldDelegate {
         } else if (passwordTextField.text != retypePasswordTextField.text) {
             showAlert("Error", "Two passwords must match.")
         } else {
+            signUpButton.isEnabled = false
+            activityIndicator.startAnimating()
             var type: String = "Teacher";
             var gender : String = "Female";
             if (roleSegmentedControl.selectedSegmentIndex == 0) { type = "Student"; }

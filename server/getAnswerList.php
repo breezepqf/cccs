@@ -8,9 +8,7 @@ $conn = connect_db($dbhost, $dbuser, $dbpass, $dbname);
 if ($_GET["type"] != "Teacher")
     die(encode_result(1, "Permission denied."));
 
-$user_info = validate_user($conn, $_GET["username"], $_GET["password"], $_GET["type"]);
-
-if ($user_info == null)
+if (validate_user($conn, $_GET["username"], $_GET["password"], $_GET["type"]) == null)
     die(encode_result(1, "Wrong username or password."));
 
 $answerlist = get_answer_list_by_qid($conn, $_GET["qid"]);

@@ -13,12 +13,14 @@ class addCourseViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var creditTextField: UITextField!
     @IBOutlet weak var placeTextField: UITextField!
     @IBOutlet weak var mainButton: UIButton!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         courseNameTextField.delegate = self
         creditTextField.delegate = self
         placeTextField.delegate = self
+        activityIndicator.hidesWhenStopped = true
     }
 
     override func didReceiveMemoryWarning() {
@@ -44,6 +46,10 @@ class addCourseViewController: UIViewController, UITextFieldDelegate {
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.mainButton.isEnabled = true
+                self.activityIndicator.stopAnimating()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -54,7 +60,9 @@ class addCourseViewController: UIViewController, UITextFieldDelegate {
                 if (responseDic["code"] as! Int == 1) {
                     self.showAlert("Error", responseDic["info"] as! String)
                 } else {
-                    DispatchQueue.main.async { self.navigationController?.popViewController(animated: true) }
+                    DispatchQueue.main.async {
+                        self.navigationController?.popViewController(animated: true)
+                    }
                     self.showAlert("Success", responseDic["info"] as! String)
                 }
             } catch let parsingError {
@@ -73,6 +81,8 @@ class addCourseViewController: UIViewController, UITextFieldDelegate {
         } else if (placeTextField.text! == "") {
             self.showAlert("Error", "Place cannot be empty")
         } else {
+            mainButton.isEnabled = false
+            activityIndicator.startAnimating()
             makeAddCourseCall(courseNameTextField.text!, creditTextField.text!, placeTextField.text!)
         }
     }

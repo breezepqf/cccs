@@ -13,6 +13,8 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
     @IBOutlet weak var questionTableView: UITableView!
     @IBOutlet weak var answerSegmentedControl: UISegmentedControl!
     @IBOutlet weak var questionDescriptionTextField: UITextField!
+    @IBOutlet weak var mainButton: UIButton!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
     var currentLesson: Lesson = Lesson([:])
     var newQuestion: Question = Question([:])
@@ -26,6 +28,7 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
         for i in 0..<newQuestion.options.count {
             newQuestion.options[i] = "Click to edit"
         }
+        activityIndicator.hidesWhenStopped = true
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -44,6 +47,7 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
     @IBAction func addOption(_ sender: Any) {
         if newQuestion.options.count >= 4 {
             self.showAlert("Error", "You can set 4 options at most.")
+            return
         }
         answerSegmentedControl.insertSegment(withTitle: String(UnicodeScalar(newQuestion.options.count + 65)!), at: answerSegmentedControl.numberOfSegments, animated: true)
         newQuestion.options.append("Click to edit")
@@ -71,12 +75,14 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
                 [unowned self] success, authenticationError in
                 DispatchQueue.main.async {
                     if (success) {
+                        self.mainButton.isEnabled = false
+                        self.activityIndicator.startAnimating()
                         self.makeRaiseQuestionCall(self.currentLesson, self.newQuestion)
                     }
                 }
             }
         } else {
-            self.showAlert("Touch ID not available", "Your device is not configured for Touch ID.")
+            self.showAlert("Touch ID / Face ID not available", "Your device is not configured for Touch ID / Face ID.")
         }
     }
     
@@ -89,6 +95,10 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.mainButton.isEnabled = true
+                self.activityIndicator.stopAnimating()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -99,7 +109,9 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
                 if (responseDic["code"] as! Int == 1) {
                     self.showAlert("Error", responseDic["info"] as! String)
                 } else {
-                    DispatchQueue.main.async { self.navigationController?.popViewController(animated: true) }
+                    DispatchQueue.main.async {
+                        self.navigationController?.popViewController(animated: true)
+                    }
                     self.showAlert("Success", responseDic["info"] as! String)
                 }
             } catch let parsingError {
@@ -134,7 +146,7 @@ class raiseQuestionViewController: UIViewController, UITextFieldDelegate, UITabl
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let alert = UIAlertController(title: "Edit", message: "Edit option", preferredStyle: .alert)
+        let alert = UIAlertController(title: "Edit", message: "Edit Option:", preferredStyle: .alert)
         alert.addTextField(configurationHandler: { _ in })
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in })
         let okAction = UIAlertAction(title: "OK", style: .default, handler: { _ in

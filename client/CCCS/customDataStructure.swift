@@ -8,7 +8,7 @@
 
 import Foundation
 
-let serverDir = "http://47.95.238.186/cccs"
+let serverDir = "http://127.0.0.1/cccs"
 
 var user = User("", [:])
 
@@ -17,8 +17,8 @@ class User {
     var username: String
     var password: String
     var realname: String
-    var gender: String // Male or Female
-    var type: String   // Student or Teacher
+    var gender: String  // Male or Female
+    var type: String    // Student or Teacher
     init(_ type: String, _ dic: [String : Any]) {
         self.type = type
         if (type == "Student") {

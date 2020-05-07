@@ -14,11 +14,15 @@ class selectCourseTableViewController: UITableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        self.refreshControl = UIRefreshControl()
+        self.refreshControl!.addTarget(self, action: #selector(refreshData),for: .valueChanged)
+        self.refreshControl!.attributedTitle = NSAttributedString(string: "Loading")
+        refreshData()
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        makeGetCourseListCall()
+        self.refreshData()
     }
     
     override func didReceiveMemoryWarning() {
@@ -33,6 +37,11 @@ class selectCourseTableViewController: UITableViewController {
         }
     }
     
+    @objc func refreshData(){
+        self.refreshControl!.beginRefreshing()
+        makeGetCourseListCall()
+    }
+    
     func makeGetCourseListCall() {
         let str = "\(serverDir)/getCourseList.php?username=\(user.username)&password=\(user.password)&type=\(user.type)&all=1"
         let urlRequest = URLRequest(url: URL(string: str)!)
@@ -42,6 +51,9 @@ class selectCourseTableViewController: UITableViewController {
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
+            }
+            DispatchQueue.main.async {
+                self.refreshControl!.endRefreshing()
             }
             do {
                 let responseJson = try JSONSerialization.jsonObject(with: responseData, options: [])
@@ -53,7 +65,9 @@ class selectCourseTableViewController: UITableViewController {
                     for courseDic in responseDic["info"] as! [[String : Any]] {
                         self.courseListAll.append(Course(courseDic))
                     }
-                    DispatchQueue.main.async { self.courseTableView.reloadData() }
+                    DispatchQueue.main.async {
+                        self.courseTableView.reloadData()
+                    }
                 }
             } catch let parsingError {
                 self.showAlert("Error", parsingError.localizedDescription)
@@ -89,15 +103,11 @@ class selectCourseTableViewController: UITableViewController {
         task.resume()
     }
     
-    // MARK: - Table view data source
-    
     override func numberOfSections(in tableView: UITableView) -> Int {
-        // return the number of sections
         return self.courseListAll.count
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        // return the number of rows
         return 4
     }
     

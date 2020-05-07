@@ -13,7 +13,7 @@ import CoreLocation
 class courseDetailViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, CLLocationManagerDelegate {
     @IBOutlet weak var courseDetailTableView: UITableView!
     @IBOutlet weak var mainButton: UIButton!
-    @IBOutlet weak var queryButton: UIButton!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
     var locationManager: CLLocationManager = CLLocationManager()
     var cntLocation: CLLocation!
@@ -23,19 +23,30 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
         super.viewDidLoad()
         courseDetailTableView.delegate = self
         courseDetailTableView.dataSource = self
-        self.navigationItem.title = selectedCourse.name.removingPercentEncoding
+        navigationItem.title = selectedCourse.name
+        activityIndicator.hidesWhenStopped = true
+        
         if (user.type == "Teacher") {
             mainButton.setTitle("Start/Stop Lesson", for: .normal)
-            queryButton.setTitle("Query Attendance", for: .normal)
         } else {
             mainButton.setTitle("Check In", for: .normal)
-            queryButton.setTitle("Query My Attendance", for: .normal)
         }
+        
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.delegate = self
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
         cntLocation = nil
+        
+        self.courseDetailTableView.refreshControl = UIRefreshControl()
+        self.courseDetailTableView.refreshControl!.addTarget(self, action: #selector(refreshData),for: .valueChanged)
+        self.courseDetailTableView.refreshControl!.attributedTitle = NSAttributedString(string: "Loading")
+        refreshData()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        refreshData()
     }
     
     override func didReceiveMemoryWarning() {
@@ -54,12 +65,20 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
         }
     }
     
+    @objc func refreshData() {
+        self.courseDetailTableView.refreshControl!.beginRefreshing()
+        makeGetLessonListCall()
+    }
+    
     func makeGetLessonListCall() {
         let str = "\(serverDir)/getLessonList.php?username=\(user.username)&password=\(user.password)&type=\(user.type)&cid=\(selectedCourse.cid)"
         let urlRequest = URLRequest(url: URL(string: str)!)
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.courseDetailTableView.refreshControl!.endRefreshing()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -72,7 +91,9 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
                     for lessonDic in responseDic["info"] as! [[String : Any]] {
                         self.selectedCourse.lessonlist.append(Lesson(lessonDic))
                     }
-                    DispatchQueue.main.async { self.courseDetailTableView.reloadData() }
+                    DispatchQueue.main.async {
+                        self.courseDetailTableView.reloadData()
+                    }
                 } else {
                     self.showAlert("Error", responseDic["info"] as! String)
                 }
@@ -89,6 +110,10 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
         let urlConfig = URLSessionConfiguration.default
         let urlSession = URLSession(configuration: urlConfig)
         let task = urlSession.dataTask(with: urlRequest) { (data, response, error) in
+            DispatchQueue.main.async {
+                self.mainButton.isEnabled = true
+                self.activityIndicator.stopAnimating()
+            }
             guard let responseData = data else {
                 self.showAlert("Error", "Response Error.")
                 return
@@ -101,7 +126,9 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
                 } else {
                     self.showAlert("Error", responseDic["info"] as! String)
                 }
-                self.makeGetLessonListCall()
+                DispatchQueue.main.async {
+                    self.refreshData()
+                }
             } catch let parsingError {
                 self.showAlert("Error", parsingError.localizedDescription)
                 return
@@ -118,6 +145,8 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
                 [unowned self] success, authenticationError in
                 DispatchQueue.main.async {
                     if (success) {
+                        self.mainButton.isEnabled = false
+                        self.activityIndicator.startAnimating()
                         if (user.type == "Teacher") {
                             if (self.selectedCourse.lessonlist.count == 0 ||
                                 self.selectedCourse.lessonlist[0].end_time != "") {
@@ -132,16 +161,7 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
                 }
             }
         } else {
-            self.showAlert("Touch ID/Face ID not available", "Your device is not configured for Touch ID/Face ID.")
-        }
-    }
-    
-    @IBAction func questionButtonTapped(_ sender: Any) {
-        if (self.selectedCourse.lessonlist.count == 0 ||
-            self.selectedCourse.lessonlist[0].end_time != "") {
-            self.showAlert("Error", "Class not started.")
-        } else {
-            self.performSegue(withIdentifier: "segueToQuestionList", sender: self)
+            self.showAlert("Touch ID / Face ID not available", "Your device is not configured for Touch ID / Face ID.")
         }
     }
     
@@ -192,7 +212,7 @@ class courseDetailViewController: UIViewController, UITableViewDelegate, UITable
         }
         if segue.destination is questionTableViewController {
             let t = segue.destination as? questionTableViewController
-            t?.currentLesson = self.selectedCourse.lessonlist[0]
+            t?.selectedCourse = self.selectedCourse
         }
     }
 }

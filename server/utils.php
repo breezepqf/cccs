@@ -46,7 +46,7 @@ function get_distance($latitude1, $longitude1, $latitude2, $longitude2) {
 function new_user($conn, $username, $password, $type, $gender, $realname) {
     if (validate_user($conn, $username, $password, $type) != null)
         return false;
-    $realname = urlencode($realname);
+    $realname = rawurlencode($realname);
     $query = "insert into $type ".
         "(username, password, realname, gender)".
         "values".
@@ -91,10 +91,10 @@ function get_teacher_by_id($conn, $tid) {
 }
 
 function new_course($conn, $name, $tid, $credit, $place) {
-    if (get_course_by_name($conn, $name, $tid, $place))
+    $name = rawurlencode($name);
+    $place = rawurlencode($place);
+    if (get_course_by_name($conn, $name, $tid))
         return false;
-    $name = urlencode($name);
-    $place = urlencode($place);
     $query = "insert into Course ".
             "(tid, name, credit, place) ".
             "values ".
@@ -140,7 +140,7 @@ function get_selection_records_by_cid($conn, $cid) {
 }
 
 function get_course_by_name($conn, $name, $tid) {
-    $name = urlencode($name);
+    $name = rawurlencode($name);
     $query = "select * from Course ".
         "where name = '$name' and tid = $tid";
 	$retval = mysqli_query($conn, $query);
@@ -208,13 +208,6 @@ function get_lesson_by_lid($conn, $lid) {
     return mysqli_fetch_array($retval, MYSQLI_ASSOC);
 }
 
-function get_cid_by_lid($conn, $lid) {
-    $query = "select * from Lesson ".
-        "where lid = $lid";
-    $retval = mysqli_query($conn, $query);
-    return mysqli_fetch_array($retval, MYSQLI_ASSOC);
-}
-
 function get_lessonlist_by_cid($conn, $cid) {
     $query = "select * from Lesson ".
         "where cid = $cid order by start_time desc;";
@@ -278,6 +271,11 @@ function get_checkin_records_by_cid($conn, $cid) {
 }
 
 function new_question($conn, $lid, $description, $option0, $option1, $option2, $option3, $answer) {
+    $description = rawurlencode($description);
+    $option0 = rawurlencode($option0);
+    $option1 = rawurlencode($option1);
+    $option2 = rawurlencode($option2);
+    $option3 = rawurlencode($option3);
     $query = "insert into Question ".
         "(lid, description, raised_time, option0, option1, option2, option3, answer) ".
         "values ".
@@ -317,6 +315,15 @@ function get_question_list_by_lid($conn, $lid) {
     return $checkin_records;
 }
 
+function get_question_list_by_cid($conn, $cid) {
+    $query = "select a.* from Question a, Lesson b ".
+        "where a.lid = b.lid and b.cid = $cid";
+	$retval = mysqli_query($conn, $query);
+    $checkin_records = array();
+    while ($row = mysqli_fetch_array($retval, MYSQLI_ASSOC))
+        array_push($checkin_records, $row);
+    return $checkin_records;
+}
 
 function get_answer_list_by_qid($conn, $qid) {
     $query = "select * from StudentQuestion ".
@@ -328,31 +335,4 @@ function get_answer_list_by_qid($conn, $qid) {
     return $checkin_records;
 }
 
-function update_student_realname($conn, $new_realname, $sid) {
-    $query = "update Student ".
-        "set realname = '$new_realname' ".
-        "where sid = $sid";
-    return mysqli_query($conn, $query);
-}
-
-function update_teacher_realname($conn, $new_realname, $tid) {
-    $query = "update Teacher ".
-        "set realname = '$new_realname' ".
-        "where tid = $tid";
-    return mysqli_query($conn, $query);
-}
-
-function update_student_password($conn, $new_password, $sid) {
-    $query = "update Student ".
-        "set password = md5('$new_password') ".
-        "where sid = $sid";
-    return mysqli_query($conn, $query);
-}
-
-function update_teacher_password($conn, $new_password, $tid) {
-    $query = "update Teacher ".
-        "set password = md5('$new_password') ".
-        "where tid = $tid";
-    return mysqli_query($conn, $query);
-}
 ?>
